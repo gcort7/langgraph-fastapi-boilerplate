@@ -1,0 +1,32 @@
+# Loaded automatically by `docker compose up`. Everything here is a local
+# development convenience and must not reach a deployed environment.
+
+services:
+  api:
+    volumes:
+      - ./src/:/app/src/
+    command:
+      - uvicorn
+      - --factory
+      - app.api.server:create_app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --reload
+      - --reload-dir
+      - /app/src
+
+  litellm:
+    ports:
+      - "4000:4000"
+
+  litellm-db:
+    ports:
+      - "5432:5432"
+
+  otel-collector:
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "13133:13133"

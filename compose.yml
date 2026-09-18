@@ -1,0 +1,79 @@
+# A boilerplate stack. Developer conveniences (hot reload, bind mounts,
+# published debug ports) live in compose.override.yml, which Compose loads
+# automatically. Use `docker compose -f compose.yml up` to run without them.
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-8000}:8000"
+    env_file:
+      - path: .env
+        required: true
+    depends_on:
+      litellm:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    restart: unless-stopped
+
+  # Single gateway for every model call: provider keys, routing, retries and
+  # cost tracking live here rather than in application code.
+  litellm:
+    # Pin to a released digest before deploying anywhere that matters.
+    image: docker.litellm.ai/berriai/litellm:main-stable
+    env_file:
+      - path: deploy/litellm/.env
+        required: true
+    volumes:
+      - ./deploy/litellm/config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    depends_on:
+      litellm-db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness').read()
+      # Frequent probes only while the proxy is coming up; after that, every 2h.
+      start_period: 40s
+      start_interval: 5s
+      interval: 2h
+      timeout: 3s
+      retries: 6
+    restart: unless-stopped
+
+  # Backing store for the proxy's keys, spend logs and model overrides.
+  litellm-db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: litellm
+      POSTGRES_DB: litellm
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm"]
+      start_period: 20s
+      start_interval: 5s
+      interval: 2h
+      timeout: 5s
+      retries: 10
+    volumes:
+      - litellm_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.128.0
+    env_file:
+      - path: deploy/otel/.env
+        required: true
+    volumes:
+      - ./deploy/otel/collector-config.yaml:/etc/otel/config.yaml:ro
+    command: ["--config", "/etc/otel/config.yaml"]
+    restart: unless-stopped
+
+volumes:
+  litellm_db_data:

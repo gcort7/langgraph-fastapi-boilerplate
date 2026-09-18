@@ -1,0 +1,26 @@
+# LiteLLM proxy: the single gateway every model call goes through.
+#
+# The application refers to models by the aliases below, never by vendor model
+# names, so swapping a provider is a change to this file and nothing else.
+# Provider credentials are read from the proxy's environment; they must never
+# be written here.
+
+model_list:
+  - model_name: default
+    litellm_params:
+      model: openai/gpt-5-nano
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: fast
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+litellm_settings:
+  # Mirror the proxy's own spans into the collector so gateway latency and cost
+  # land in the same trace as the application spans.
+  callbacks: ["otel"]
+  drop_params: true
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

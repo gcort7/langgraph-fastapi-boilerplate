@@ -1,0 +1,53 @@
+version: 1
+
+disable_existing_loggers: false
+
+filters:
+  request_id:
+    (): app.config.logging.RequestIdFilter
+
+formatters:
+  text:
+    format: "%(asctime)s - %(name)s - %(levelname)s - [%(request_id)s] - %(message)s"
+  json:
+    (): app.config.logging.JsonFormatter
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: text
+    filters:
+      - request_id
+    stream: ext://sys.stdout
+
+loggers:
+  # Level is overridden at runtime by setup_logging() from LOG_LEVEL.
+  app:
+    level: INFO
+    handlers:
+      - console
+    propagate: false
+
+  # uvicorn's own defaults attach handlers with their own formatters. Declaring
+  # its three loggers here strips those handlers so everything funnels through
+  # the console handler above and shares one format.
+  uvicorn:
+    level: INFO
+    handlers:
+      - console
+    propagate: false
+
+  uvicorn.error:
+    level: INFO
+    handlers: []
+    propagate: true
+
+  uvicorn.access:
+    level: INFO
+    handlers: []
+    propagate: true
+
+root:
+  level: WARNING
+  handlers:
+    - console

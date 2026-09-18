@@ -1,0 +1,49 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+
+exporters:
+  debug:
+    verbosity: detailed
+
+  otlphttp/langfuse:
+    endpoint: ${env:LANGFUSE_OTEL_ENDPOINT}
+    headers:
+      x-langfuse-ingestion-version: "4"
+    auth:
+      authenticator: basicauth/langfuse
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+  basicauth/langfuse:
+    client_auth:
+      username: ${env:LANGFUSE_PUBLIC_KEY}
+      password: ${env:LANGFUSE_SECRET_KEY}
+
+service:
+  extensions: [health_check, basicauth/langfuse]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, otlphttp/langfuse]
+    # Langfuse ingests OTLP traces only. Metrics and logs stay on the debug
+    # exporter; point them at a general-purpose backend for production.
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
