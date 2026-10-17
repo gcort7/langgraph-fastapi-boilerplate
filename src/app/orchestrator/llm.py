@@ -29,4 +29,6 @@ def default_llm() -> BaseChatModel:
         temperature=settings.llm_temperature,
         timeout=settings.llm_timeout_seconds,
         max_retries=settings.llm_max_retries,
+        # Exposes LiteLLM's per-call cost header to callbacks.
+        include_response_headers=True,
     )

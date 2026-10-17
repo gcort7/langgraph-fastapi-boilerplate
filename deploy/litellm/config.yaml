@@ -17,10 +17,13 @@ model_list:
       api_key: os.environ/OPENAI_API_KEY
 
 litellm_settings:
+  # Reasoning models such as gpt-5-nano reject temperature=0. Drop parameters
+  # the selected model does not support instead of failing the request. The
+  # application still sends temperature; models that accept it keep receiving it.
+  drop_params: true
   # Mirror the proxy's own spans into the collector so gateway latency and cost
   # land in the same trace as the application spans.
   callbacks: ["otel"]
-  drop_params: true
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY

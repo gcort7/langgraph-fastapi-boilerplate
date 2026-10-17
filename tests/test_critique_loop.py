@@ -32,11 +32,11 @@ async def _run(stub: StubChatModel, max_iterations: int = 3) -> PoetryState:
 
 
 def test_approved_candidate_stops_the_loop() -> None:
-    assert should_continue(_state(approved=True, iteration=1)) == "stop"
+    assert should_continue(_state(approved=True, iteration=1)) == "success"
 
 
 def test_loop_stops_once_max_iterations_is_reached() -> None:
-    assert should_continue(_state(approved=False, iteration=3)) == "stop"
+    assert should_continue(_state(approved=False, iteration=3)) == "exhausted"
 
 
 def test_rejected_candidate_goes_back_for_revision() -> None:

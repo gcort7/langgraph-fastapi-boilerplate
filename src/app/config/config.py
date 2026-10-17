@@ -44,6 +44,8 @@ class Settings(BaseSettings):
 
     # Workflow
     max_iterations: int = 3
+    # JSONL file of node transitions for offline analysis. Unset disables it.
+    transitions_path: Path | None = None
 
     # Logging
     log_level: str = "INFO"

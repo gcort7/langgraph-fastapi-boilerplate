@@ -11,6 +11,7 @@ from app.api.middleware import RequestContextMiddleware
 from app.api.routers import register_routes
 from app.config import Settings, configure_telemetry, get_settings, setup_logging
 from app.orchestrator import build_graphs
+from app.orchestrator.transitions import JsonlTransitionSink
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Compile graphs once per process and expose them on app.state."""
     app.state.graphs = build_graphs()
+    path = get_settings().transitions_path
+    app.state.transition_sink = JsonlTransitionSink(path) if path else None
     logger.info("Server up and running")
     yield
     logger.info("Server shutting down")

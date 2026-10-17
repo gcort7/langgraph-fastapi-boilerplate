@@ -12,6 +12,10 @@ services:
     env_file:
       - path: .env
         required: true
+    environment:
+      TRANSITIONS_PATH: /app/data/transitions.jsonl
+    volumes:
+      - ./data:/app/data
     depends_on:
       litellm:
         condition: service_healthy

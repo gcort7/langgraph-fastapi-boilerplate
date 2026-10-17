@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator
 from typing import Any
 
 from langchain_core.callbacks import CallbackManagerForLLMRun
@@ -63,9 +64,16 @@ class FakeGraph:
     def __init__(self, result: dict[str, Any]) -> None:
         self.result = result
         self.calls: list[dict[str, Any]] = []
+        self.configs: list[dict[str, Any] | None] = []
 
-    async def ainvoke(
-        self, payload: dict[str, Any], config: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
+    async def astream(
+        self,
+        payload: dict[str, Any],
+        config: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[tuple[str, dict[str, Any]]]:
         self.calls.append(payload)
-        return {**payload, **self.result}
+        self.configs.append(config)
+        yield "values", payload
+        yield "updates", {"generate": self.result}
+        yield "values", {**payload, **self.result}

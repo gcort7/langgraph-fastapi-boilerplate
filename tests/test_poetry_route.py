@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator
 from typing import Any
 
 import pytest
@@ -91,10 +92,11 @@ def test_invalid_payloads_are_rejected(
 
 def test_workflow_failure_returns_a_502_envelope(app: FastAPI) -> None:
     class BrokenGraph:
-        async def ainvoke(
-            self, payload: dict[str, Any], config: dict[str, Any] | None = None
-        ) -> dict[str, Any]:
+        async def astream(
+            self, payload: dict[str, Any], **kwargs: Any
+        ) -> AsyncIterator[tuple[str, dict[str, Any]]]:
             raise RuntimeError("upstream exploded")
+            yield  # pragma: no cover
 
     app.dependency_overrides[get_poetry_graph] = BrokenGraph
     with TestClient(app) as client:
@@ -108,21 +110,11 @@ def test_workflow_failure_returns_a_502_envelope(app: FastAPI) -> None:
     assert body["request_id"] == response.headers[REQUEST_ID_HEADER]
 
 
-def test_recursion_limit_is_derived_from_the_iteration_cap(app: FastAPI) -> None:
-    class RecordingGraph:
-        def __init__(self) -> None:
-            self.config: dict[str, Any] | None = None
+def test_recursion_limit_is_derived_from_the_iteration_cap(
+    client: TestClient, fake_graph: FakeGraph
+) -> None:
+    client.post(POEMS_URL, json={**TOPIC, "max_iterations": 4})
 
-        async def ainvoke(
-            self, payload: dict[str, Any], config: dict[str, Any] | None = None
-        ) -> dict[str, Any]:
-            self.config = config
-            return {**payload, "approved": True, "iteration": 1, "feedback": ""}
-
-    graph = RecordingGraph()
-    app.dependency_overrides[get_poetry_graph] = lambda: graph
-    with TestClient(app) as client:
-        client.post(POEMS_URL, json={**TOPIC, "max_iterations": 4})
-
-    assert graph.config is not None
-    assert graph.config["recursion_limit"] == 13
+    config = fake_graph.configs[0]
+    assert config is not None
+    assert config["recursion_limit"] == 13
