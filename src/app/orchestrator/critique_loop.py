@@ -20,6 +20,10 @@ tracer = trace.get_tracer(__name__)
 
 GENERATE = "generate"
 JUDGE = "judge"
+SUCCESS = "success"
+EXHAUSTED = "exhausted"
+
+Decision = Literal["continue", "success", "exhausted"]
 
 
 class Critique(BaseModel):
@@ -52,12 +56,12 @@ class CritiqueLoopState(BaseModel):
     )
 
 
-def should_continue(state: CritiqueLoopState) -> Literal["continue", "stop"]:
+def should_continue(state: CritiqueLoopState) -> Decision:
     """Decide whether to revise again. Kept name-free so it is testable alone."""
     if state.approved:
-        return "stop"
+        return "success"
     if state.iteration >= state.max_iterations:
-        return "stop"
+        return "exhausted"
     return "continue"
 
 
@@ -141,11 +145,11 @@ def build_critique_loop[StateT: CritiqueLoopState, OutputT: BaseModel](
             "feedback": "" if critique.approved else critique.feedback,
         }
 
-    def route(state: StateT) -> Literal["continue", "stop"]:
+    def route(state: StateT) -> Decision:
         decision = should_continue(state)
         logger.info(
             "Loop %s workflow=%s approved=%s iteration=%s/%s",
-            "finished" if decision == "stop" else "continuing",
+            decision,
             workflow,
             state.approved,
             state.iteration,
@@ -153,11 +157,34 @@ def build_critique_loop[StateT: CritiqueLoopState, OutputT: BaseModel](
         )
         return decision
 
+    def success(state: StateT) -> dict[str, Any]:
+        logger.info(
+            "Workflow succeeded workflow=%s iteration=%s", workflow, state.iteration
+        )
+        return {}
+
+    def exhausted(state: StateT) -> dict[str, Any]:
+        logger.warning(
+            "Workflow exhausted workflow=%s iteration=%s/%s",
+            workflow,
+            state.iteration,
+            state.max_iterations,
+        )
+        return {}
+
     logger.info("Building workflow graph workflow=%s", workflow)
     graph = StateGraph(state_schema)
     graph.add_node(GENERATE, generate)
     graph.add_node(JUDGE, judge)
+    graph.add_node(SUCCESS, success)
+    graph.add_node(EXHAUSTED, exhausted)
     graph.add_edge(START, GENERATE)
     graph.add_edge(GENERATE, JUDGE)
-    graph.add_conditional_edges(JUDGE, route, {"continue": GENERATE, "stop": END})
+    graph.add_conditional_edges(
+        JUDGE,
+        route,
+        {"continue": GENERATE, "success": SUCCESS, "exhausted": EXHAUSTED},
+    )
+    graph.add_edge(SUCCESS, END)
+    graph.add_edge(EXHAUSTED, END)
     return graph.compile()
