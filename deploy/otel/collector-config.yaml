@@ -12,7 +12,7 @@ processors:
 
 exporters:
   debug:
-    verbosity: detailed
+    verbosity: basic
 
   otlphttp/langfuse:
     endpoint: ${env:LANGFUSE_OTEL_ENDPOINT}
